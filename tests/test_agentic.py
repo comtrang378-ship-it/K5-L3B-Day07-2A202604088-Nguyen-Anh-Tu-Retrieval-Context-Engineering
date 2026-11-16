@@ -1,5 +1,7 @@
 """Offline behavioral checks only; fake adapters do not measure model quality."""
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'starter'))
@@ -19,8 +21,12 @@ class Retriever:
 
 class AgentTests(unittest.TestCase):
     def test_agent_searches_and_cites_actual_context(self):
-        c = Controller([{'action': 'search', 'query': 'hoàn tiền'},
-                        {'action': 'answer', 'answer': '7 ngày [c1]', 'citations': ['c1']}])
+        c = Controller([
+            {'action': 'search', 'query': 'hoàn tiền', 'provider': 'local',
+             'model': 'test-model', 'usage': {'input_tokens': 10}, 'cost_usd': 0.001},
+            {'action': 'answer', 'answer': '7 ngày [c1]', 'citations': ['c1'],
+             'provider': 'local', 'model': 'test-model', 'cost_usd': 0.002},
+        ])
         r = Retriever([CHUNK]); result = run_agent('Hoàn tiền?', c, r, filters={'year': 2025})
         self.assertEqual(result['status'], 'answered')
         self.assertEqual(result['citations'], ['c1'])
@@ -70,5 +76,66 @@ class AgentTests(unittest.TestCase):
             def search(self, query, *, filters, top_k): raise ConnectionError('database unavailable')
         with self.assertRaises(ConnectionError):
             run_agent('q', Controller([{'action':'search','query':'q'}]), Broken())
+
+    def test_trace_persists_search_context_answer_and_citations(self):
+        c = Controller([
+            {'action': 'search', 'query': 'hoàn tiền', 'provider': 'local',
+             'model': 'test-model', 'usage': {'input_tokens': 10}, 'cost_usd': 0.001},
+            {'action': 'answer', 'answer': '7 ngày [c1]', 'citations': ['c1'],
+             'provider': 'local', 'model': 'test-model', 'cost_usd': 0.002},
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'agent.jsonl'
+            result = run_agent('Hoàn tiền?', c, Retriever([CHUNK]), trace_path=path)
+            record = json.loads(path.read_text(encoding='utf-8').splitlines()[0])
+        self.assertEqual(record['trace_id'], result['trace_id'])
+        self.assertEqual(record['status'], 'answered')
+        self.assertEqual(record['tool_call_count'], 1)
+        self.assertEqual(record['events'][0]['tool_call']['top_k'], 3)
+        self.assertEqual(record['context_ids'], ['c1'])
+        self.assertEqual(record['answer'], '7 ngày [c1]')
+        self.assertEqual(record['citations'], ['c1'])
+        self.assertAlmostEqual(record['reported_cost_usd'], 0.003)
+
+    def test_trace_persists_retriever_errors_before_propagating(self):
+        class Broken:
+            def search(self, query, *, filters, top_k):
+                raise ConnectionError('database unavailable')
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'agent.jsonl'
+            with self.assertRaises(ConnectionError):
+                run_agent(
+                    'q', Controller([{'action': 'search', 'query': 'q'}]),
+                    Broken(), trace_path=path,
+                )
+            record = json.loads(path.read_text(encoding='utf-8').splitlines()[0])
+        self.assertEqual(record['status'], 'error')
+        self.assertEqual(record['error']['stage'], 'retriever')
+        self.assertIn('database unavailable', record['error']['message'])
+        self.assertEqual(record['events'][0]['status'], 'error')
+        self.assertEqual(record['events'][0]['tool_call']['query'], 'q')
+
+    def test_trace_keeps_last_context_when_later_search_fails(self):
+        class FailsOnSecondSearch:
+            def __init__(self): self.calls = 0
+            def search(self, query, *, filters, top_k):
+                self.calls += 1
+                if self.calls == 2:
+                    raise ConnectionError('second search failed')
+                return [CHUNK]
+
+        controller = Controller([
+            {'action': 'search', 'query': 'first'},
+            {'action': 'search', 'query': 'second'},
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'agent.jsonl'
+            with self.assertRaises(ConnectionError):
+                run_agent('q', controller, FailsOnSecondSearch(), trace_path=path)
+            record = json.loads(path.read_text(encoding='utf-8').splitlines()[0])
+        self.assertIn('[c1 | doc.pdf | page 1]', record['context'])
+        self.assertEqual(record['events'][1]['status'], 'error')
+        self.assertEqual(record['tool_call_count'], 2)
 
 if __name__ == '__main__': unittest.main()

@@ -38,6 +38,19 @@ class BaselineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(self.chunks, [{**self.q, 'gold': [wrong]}])
 
+    def test_gold_matching_ignores_pdf_line_wrapping(self):
+        source = chunk('pdf', 'The system can generate recommenda-\ntions for users.')
+        question = {
+            **self.q,
+            'gold': [{
+                'source_id': 'doc',
+                'page': 1,
+                'evidence': 'system can generate recommenda- tions for users.',
+            }],
+        }
+        self.assertTrue(hit(source, question['gold']))
+        validate([source], [question])
+
     def test_budget_dedup_and_empty_query(self):
         context, ids = pack_context([self.chunks[0], self.chunks[0]], 800)
         self.assertEqual(ids, ['a'])

@@ -48,7 +48,13 @@ def validate(chunks, questions):
 
 
 def hit(chunk, gold):
-    return any(chunk['source_id'] == g['source_id'] and chunk['page'] == g['page'] and g['evidence'] in chunk['text'] for g in gold)
+    text = ' '.join(chunk['text'].split())
+    return any(
+        chunk['source_id'] == g['source_id']
+        and chunk['page'] == g['page']
+        and ' '.join(g['evidence'].split()) in text
+        for g in gold
+    )
 
 
 class TfidfIndex:
@@ -64,10 +70,25 @@ class TfidfIndex:
         norm = math.sqrt(sum(value * value for value in vector.values())) or 1
         return {term: value / norm for term, value in vector.items()}
 
-    def search(self, question, top_k=3):
+    def score(self, question, chunk):
+        query = self._vector(Counter(tokenize(question)))
+        document = self._vector(Counter(tokenize(chunk['text'])))
+        return sum(value * document.get(term, 0) for term, value in query.items())
+
+    def search(self, question, top_k=3, filters=None):
+        if filters:
+            unsupported = set(filters) - {'section'}
+            if unsupported:
+                raise ValueError(f'Unsupported filter fields: {sorted(unsupported)}')
+            for key, value in filters.items():
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f'Filter {key!r} must be a non-empty string.')
         query = self._vector(Counter(tokenize(question)))
         results = []
         for chunk, vector in zip(self.chunks, self.vectors):
+            if filters and any(chunk.get('metadata', {}).get(key) != value
+                               for key, value in filters.items()):
+                continue
             score = sum(value * vector.get(term, 0) for term, value in query.items())
             if score > 0:
                 results.append({**chunk, 'score': score, 'strategy': 'tfidf'})

@@ -3,20 +3,38 @@
 | File | Công dụng |
 |---|---|
 | `agentic.py` | Khung agent ví dụ với số lượt search, top-k và context budget có thể cấu hình |
+| `local_controller.py` | Controller Transformers local dùng model instruct để chọn search/answer |
+| `agent_benchmark.py` | Chạy agent thật trên split và lưu traces, cases, review template |
 | `baseline.py` | TF-IDF lexical baseline, chạy offline |
+| `retrieval.py` | Dense Day 6, TF-IDF, BM25 + RRF, dense + TF-IDF rerank, keyword query rewrite |
+| `retrieval_benchmark.py` | Chạy năm phương pháp trên cùng benchmark và lưu trace/summary |
+| `tracing.py` | Ghi JSONL UTF-8 cho retrieval và agent |
 | `convert_day6.py` | Chuyển một số trường JSON từ Day 6 |
 | `agent_metrics.py` | Tổng hợp nhãn đánh giá do bạn tự chấm |
 
-Starter **chưa phải solution hoàn chỉnh**. Bạn phải nối model và vector store thật, triển khai ít nhất 3 phương pháp retrieval do bạn chọn, gồm dense trên vector store Day 6. Mock chỉ dùng để test code.
+Các phương pháp dùng chung chunk và vector Day 6: dense exact cosine, TF-IDF, BM25 + dense RRF, dense candidate top-30 được xếp lại bằng TF-IDF, và dense retrieval với keyword-focused query rewrite. RRF và candidate count là cấu hình ban đầu, cần chọn trên dev. Rewrite bỏ từ hỏi/chức năng tiếng Anh, giữ thuật ngữ và phủ định; không gọi model ngoài. Dense không có fallback giả.
 
-## 1. Kết nối agent
+## 1. Chạy agent với model local
 
-Trong `agentic.py`, hiện thực:
+`EmbeddingGemma 2` tại `D:\Models\embeddinggemma-2` chỉ tạo query embedding, không sinh câu trả lời. `local_controller.py` dùng model instruct sinh văn bản; lượt chạy đã chuẩn bị dùng `Qwen2.5-1.5B-Instruct` tại `D:\Models\Qwen2.5-1.5B-Instruct` trên CPU. Inference chỉ đọc model local (`local_files_only=True`), không gửi câu hỏi hay tài liệu ra API. Model loading cần chạy bằng virtual environment Day 06 có `torch` và `transformers`.
 
-- `Controller.decide`: gọi model thật và trả `{action: "search", query: "..."}` hoặc `{action: "answer", answer: "... [chunk-id]", citations: ["chunk-id"]}`.
-- `Retriever.search`: tạo query embedding tương thích Day 6, truy vấn vector store thật và trả chunk theo [định dạng dữ liệu](../data/README.md).
+`LocalTransformersController` trả JSON action `search` hoặc `answer`; text trong tài liệu được xem là dữ liệu không đáng tin, không phải chỉ dẫn. `agent_benchmark.py` nối controller với dense retriever Day 6 strategy B, không đưa gold/expected answer vào agent. Ví dụ chạy baseline dev từ thư mục Day 07:
 
-Tự viết chương trình nối hai phần với `run_agent`, hoặc thay thế bằng kiến trúc nhiều tool. Tham số `max_searches`, `top_k` và `budget` chỉ là mặc định của ví dụ, không phải giới hạn của đề. Xem `tests/test_agentic.py` để hiểu cách gọi; kết nối trong test là mock. Khung code kiểm tra citation ID có trong context, nhưng bạn phải tự đọc xem nguồn có hỗ trợ câu trả lời. Báo lỗi kết nối, không thay bằng kết quả giả.
+```powershell
+$python = "..\..\Day06\K5-L3B-Day06-Nguyen-Anh-T---2A202604088-DataIngestionEngineering\starter\.venv\Scripts\python.exe"
+$day6 = "..\..\Day06\K5-L3B-Day06-Nguyen-Anh-T---2A202604088-DataIngestionEngineering\starter"
+& $python "starter\agent_benchmark.py" --day6-starter $day6 `
+  --benchmark "data\benchmark.json" --split dev `
+  --model-path "D:\Models\Qwen2.5-1.5B-Instruct" `
+  --output "starter\results\agent" --top-k 3 `
+  --context-budget 800 --max-searches 2
+```
+
+Mỗi lượt tạo thư mục riêng có `summary.json`, `traces.jsonl`, `traces.json`, `cases.json` và `reviews_template.json`. Review template có nhãn trống cần người chấm điền. Dùng `--top-k 5 --context-budget 1600` để đo cấu hình context A trên dev. Chỉ chạy test sau khi review câu trả lời/citation trên dev và chốt cấu hình.
+Model chạy CPU; mặc định tối đa 96 token mỗi quyết định và hai lượt search. Có thể dùng `--limit 1` để kiểm tra tích hợp, nhưng kết quả đó được đánh dấu partial và không thay cho benchmark đủ split.
+Lần smoke D01 hiện có đã chạy với Qwen local nhưng kết thúc `error` sau khoảng 141 giây vì model không trả action JSON hợp lệ; trace nằm tại `starter/results/agent/smoke/dev-20261116T052727903716Z-6072dff7/traces.jsonl`. Vì vậy chưa có đánh giá answer/citation của agent, và chưa chạy full dev hoặc test. Lỗi parse lưu tối đa 500 ký tự đầu của output model trong trace để chẩn đoán; không xem nội dung đó là câu trả lời hay kết quả benchmark.
+
+Tham số `max_searches`, `top_k` và `budget` của `run_agent` có thể cấu hình. Khung code kiểm tra citation ID có trong context, nhưng ID hợp lệ chưa chứng minh nguồn hỗ trợ câu trả lời; cần đọc evidence. Báo lỗi model/vector store, không thay bằng kết quả giả.
 
 ## 2. Chạy TF-IDF baseline
 
@@ -29,7 +47,43 @@ python3 starter/baseline.py --chunks data/example_chunks.json --questions data/e
 
 Kết quả có `summary.json` và `traces.json`. Dữ liệu mẫu chỉ có một câu, không đủ để nộp bài. TF-IDF là lexical retrieval, không dùng filter và không thay dense retrieval.
 
-## 3. Dùng dữ liệu Day 6
+## 3. So sánh năm phương pháp
+
+Chạy từ Day 07 root bằng virtual environment Day 06, vì nơi đó có `sentence-transformers`, `psycopg`, `pgvector` và `rank-bm25` đã dùng để tạo index:
+
+```powershell
+$python = "..\..\Day06\K5-L3B-Day06-Nguyen-Anh-T---2A202604088-DataIngestionEngineering\starter\.venv\Scripts\python.exe"
+$day6 = "..\..\Day06\K5-L3B-Day06-Nguyen-Anh-T---2A202604088-DataIngestionEngineering\starter"
+& $python "starter\retrieval_benchmark.py" --day6-starter $day6 `
+  --benchmark "data\benchmark.json" --split dev `
+  --output "starter\results\retrieval"
+```
+
+Sau khi chọn cấu hình chỉ bằng dev, chạy lại với `--split test`; không dùng test để chỉnh tham số. Runner đọc cấu hình `DATABASE_URL`/`EMBEDDING_MODEL` từ `.env` Day 06, chỉ đọc strategy B và mặc định yêu cầu đủ 188 chunks. Nó không tạo index, không tạo vector ngẫu nhiên và dừng rõ ràng nếu database hoặc model không sẵn sàng.
+
+Các phương pháp, cùng top-k và filter section nếu câu hỏi nêu rõ trước retrieval:
+
+1. `dense`: embedding query `SearchQuery` tương thích index và exact cosine trên pgvector B.
+2. `tfidf`: TF-IDF cosine trên cùng 188 chunk.
+3. `hybrid_rrf`: dense + BM25, kết hợp ranking bằng `1/(k+dense_rank) + 1/(k+bm25_rank)`; mặc định `k=60`.
+4. `dense_tfidf_rerank`: lấy tối đa 30 dense candidates rồi xếp lại theo TF-IDF trên cùng corpus.
+5. `dense_keyword_rewrite`: bỏ từ hỏi/chức năng trước khi embed; log cả query ban đầu và query đã chuyển đổi.
+
+Mỗi lượt tạo thư mục riêng dưới `starter/results/retrieval/`, có `comparison.json`, summary theo phương pháp và `traces.jsonl`. Summary ghi thời gian build index, tổng thời gian từng cấu hình, median search latency, chi phí dịch vụ cục bộ và metric `n/N`. Trace lưu query, query đã rewrite, filter, cấu hình/candidate count, từng kết quả (ID, score/rank, text, source, page, metadata), context cuối, ID context, latency và lỗi. Retrieval metrics chỉ tính trên câu có đáp án; câu thiếu evidence vẫn được truy xuất và ghi trace nhưng không vào mẫu số. Gold chỉ được dùng sau retrieval để chấm, không truyền vào retriever.
+
+Trong agent thật, truyền đường dẫn để lưu toàn bộ trace:
+
+```python
+result = run_agent(
+    question, controller, retriever,
+    filters=filters,
+    trace_path="starter/results/agent/dev.jsonl",
+)
+```
+
+Trace agent bổ sung từng tool call, kết quả, context, câu trả lời, citations, status/lỗi và thời gian. Nếu controller trả thêm `provider`, `model`, `usage` hoặc `cost_usd`, các trường đó cũng được ghi. Lỗi vẫn được log rồi ném tiếp; ghi trace thất bại cũng được báo rõ.
+
+## 4. Dùng dữ liệu Day 6
 
 Xuất chunk và câu hỏi thành hai JSON array. Starter Day 6 không quy định tên bảng hay cách xuất; bạn cần tự thực hiện. Nếu chunk có `chunk_id`, `document_id`, `source`, `page`, `text`, `metadata` và câu hỏi có `gold_source_id`, `gold_page`, `evidence_quote`, chạy:
 
@@ -42,12 +96,12 @@ Thay phần trong `< >` bằng đường dẫn thật. Script chỉ đổi tên 
 
 `--split dev` chỉ chấm dev. Sau khi chốt cấu hình, dùng `--split test` và chọn thư mục kết quả khác. Nếu test Day 6 từng dùng để chỉnh hệ thống, tạo test mới theo [GUIDE.md](../GUIDE.md). Baseline mẫu dùng evidence nằm trong một chunk và context từ top-3; cần mở rộng hoặc tự đánh giá nếu dùng multi-hop, context từ nhiều lượt hay schema khác. Khớp nguyên văn bằng code không thay thế đánh giá thủ công.
 
-## 4. Tổng hợp đánh giá agent
+## 5. Tổng hợp đánh giá agent
 
 Sau khi chạy agent thật và tự chấm, chuẩn bị ba JSON array:
 
 - `cases.json`: mỗi câu có `id`, `split`, `answerable` (`true` nếu có đủ evidence).
-- `traces.json`: mỗi kết quả có `query_id`, `status` (`answered`, `abstain`, `error`), `events`, `citations`. Thêm `query_id` vào kết quả `run_agent`; lỗi kết nối ghi riêng với `status: "error"`. Script đếm tool use qua event `search`: nếu dùng nhiều tool, chuẩn hóa mỗi lượt retrieval về event này và ghi tên tool trong trường khác, hoặc tự viết metric tương đương.
+- `traces.json`: mỗi kết quả có `query_id`, `status` (`answered`, `abstain`, `error`), `events`, `citations`. `agent_benchmark.py` đã tạo file này cùng `traces.jsonl`; lỗi được ghi riêng với `status: "error"`. Script đếm tool use qua event `search`.
 - `reviews.json`: mỗi nhãn có `query_id`, `citation_support` là danh sách đúng/sai ứng với từng citation. Câu có đáp án cần `answer_grade` 0–2 theo [BENCHMARK.md](../BENCHMARK.md); nếu bị từ chối, chấm 0. Câu thiếu evidence cần `abstention_correct` (`true`/`false`) do người chấm xác nhận. Lần chạy lỗi không cần nhãn.
 
 ```bash

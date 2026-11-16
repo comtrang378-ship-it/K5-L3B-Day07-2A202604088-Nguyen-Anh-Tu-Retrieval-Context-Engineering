@@ -1,0 +1,386 @@
+[
+  {
+    "id": "D01",
+    "split": "dev",
+    "topic": "AI system definition",
+    "type": "direct",
+    "question": "How does the AI RMF define an AI system?",
+    "answerable": true,
+    "expected_answer": "An engineered or machine-based system that can generate predictions, recommendations, or decisions for a given set of objectives and influence real or virtual environments.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 6,
+        "evidence": "an engineered or machine-based system that can, for a given set of objectives, generate outputs such as predictions, recommenda- tions, or decisions influencing real or virtual environments."
+      }
+    ]
+  },
+  {
+    "id": "D02",
+    "split": "dev",
+    "topic": "AI risk framing",
+    "type": "paraphrase",
+    "question": "Why does the framework treat AI risk as more than a technical issue?",
+    "answerable": true,
+    "expected_answer": "AI systems are socio-technical: their risks and benefits arise from technical aspects interacting with societal factors, human behavior, and the context in which they are used.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 6,
+        "evidence": "can emerge from the interplay of technical aspects combined with societal factors related to how a system is used, its interactions with other AI systems, who operates it, and the social context in which it is deployed."
+      }
+    ]
+  },
+  {
+    "id": "D03",
+    "split": "dev",
+    "topic": "Framework purpose",
+    "type": "direct",
+    "question": "What is the AI RMF intended to help organizations do?",
+    "answerable": true,
+    "expected_answer": "Manage AI risks and promote the trustworthy and responsible development and use of AI systems.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 7,
+        "evidence": "to help manage the many risks of AI and promote trustwor- thy and responsible development and use of AI systems."
+      }
+    ]
+  },
+  {
+    "id": "D04",
+    "split": "dev",
+    "topic": "Framework applicability",
+    "type": "direct",
+    "question": "Which four descriptors explain how the AI RMF is intended to be used?",
+    "answerable": true,
+    "expected_answer": "It is voluntary, rights-preserving, non-sector-specific, and use-case agnostic.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 7,
+        "evidence": "voluntary, rights-preserving, non-sector-specific, and use-case agnostic"
+      }
+    ]
+  },
+  {
+    "id": "D05",
+    "split": "dev",
+    "topic": "AI RMF Core overview",
+    "type": "direct",
+    "question": "Name the four high-level functions in the AI RMF Core.",
+    "answerable": true,
+    "expected_answer": "GOVERN, MAP, MEASURE, and MANAGE.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 8,
+        "evidence": "GOVERN , MAP, MEASURE , and MANAGE"
+      }
+    ]
+  },
+  {
+    "id": "D06",
+    "split": "dev",
+    "topic": "Risk definition",
+    "type": "paraphrase",
+    "question": "Which two components make up risk in the AI RMF's definition?",
+    "answerable": true,
+    "expected_answer": "The likelihood (probability) of an event and the magnitude or degree of its consequences.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 9,
+        "evidence": "probability of occurring and the magnitude or degree of the consequences of the corresponding event."
+      }
+    ]
+  },
+  {
+    "id": "D07",
+    "split": "dev",
+    "topic": "Risk measurement",
+    "type": "conditional",
+    "question": "If an organization cannot appropriately measure an AI risk, does that by itself establish that the system is high-risk or low-risk?",
+    "answerable": true,
+    "expected_answer": "No. Inability to measure the risk appropriately does not imply either a high or a low risk.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 10,
+        "evidence": "The inability to appropriately measure AI risks does not imply that an AI system necessarily poses either a high or low risk."
+      }
+    ]
+  },
+  {
+    "id": "D08",
+    "split": "dev",
+    "topic": "Lifecycle risk measurement",
+    "type": "paraphrase",
+    "question": "Can measuring the same AI system at an earlier lifecycle stage produce a different risk result than measuring it later?",
+    "answerable": true,
+    "expected_answer": "Yes. Measurements at earlier and later lifecycle stages may differ.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 11,
+        "evidence": "Measuring risk at an earlier stage in the AI lifecycle may yield different results than measuring risk at a later stage"
+      }
+    ]
+  },
+  {
+    "id": "D09",
+    "split": "dev",
+    "topic": "Risk tolerance",
+    "type": "metadata_filter",
+    "question": "In section 1.2.2 Risk Tolerance, who should set a reasonable risk tolerance when established guidelines do not exist?",
+    "answerable": true,
+    "expected_answer": "The organization should define a reasonable risk tolerance.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 12,
+        "evidence": "Where established guidelines do not exist, organizations should define reasonable risk tolerance."
+      }
+    ],
+    "filter": {
+      "section": "1.2.2 Risk Tolerance"
+    }
+  },
+  {
+    "id": "D10",
+    "split": "dev",
+    "topic": "Risk prioritization",
+    "type": "conditional",
+    "question": "If significant negative impacts are imminent or severe harms are occurring, what should happen to development and deployment until the risks are controlled?",
+    "answerable": true,
+    "expected_answer": "They should cease safely until the risks can be sufficiently managed.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 13,
+        "evidence": "development and deployment should cease in a safe manner until risks can be sufficiently managed."
+      }
+    ]
+  },
+  {
+    "id": "D11",
+    "split": "dev",
+    "topic": "Organizational integration",
+    "type": "conditional",
+    "question": "Is adopting the AI RMF alone enough to create organizational commitment and appropriate risk-management incentives?",
+    "answerable": true,
+    "expected_answer": "No. The framework alone does not create the organizational changes or incentives; effective risk management requires senior-level organizational commitment.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 14,
+        "evidence": "Use of the AI RMF alone will not lead to these changes or provide the appropriate incentives. Effective risk management is realized through organizational commitment at senior levels"
+      }
+    ]
+  },
+  {
+    "id": "D12",
+    "split": "dev",
+    "topic": "Trustworthy AI",
+    "type": "conditional",
+    "question": "Does addressing trustworthy-AI characteristics one at a time guarantee that an AI system is trustworthy?",
+    "answerable": true,
+    "expected_answer": "No. Addressing the characteristics individually does not ensure system trustworthiness; tradeoffs are usually involved.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 17,
+        "evidence": "Addressing AI trustworthiness characteristics individually will not ensure AI system trust- worthiness; tradeoffs are usually involved"
+      }
+    ]
+  },
+  {
+    "id": "D13",
+    "split": "dev",
+    "topic": "Deployment decisions",
+    "type": "paraphrase",
+    "question": "What should inform a decision to commission or deploy an AI system?",
+    "answerable": true,
+    "expected_answer": "A contextual assessment of trustworthiness characteristics and relative risks, impacts, costs, and benefits.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 18,
+        "evidence": "The decision to commission or deploy an AI system should be based on a contextual assessment of trustworthi- ness characteristics and the relative risks, impacts, costs, and benefits, and informed by a broad set of interested parties."
+      }
+    ]
+  },
+  {
+    "id": "D14",
+    "split": "dev",
+    "topic": "Accountability and transparency",
+    "type": "metadata_filter",
+    "question": "Within section 3.4 Accountable and Transparent, what does transparency reflect about an AI system?",
+    "answerable": true,
+    "expected_answer": "The extent to which information about the AI system and its outputs is available to individuals interacting with it.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 20,
+        "evidence": "the extent to which information about an AI system and its outputs is available to individuals interacting with such a system"
+      }
+    ],
+    "filter": {
+      "section": "3.4 Accountable and Transparent"
+    }
+  },
+  {
+    "id": "D15",
+    "split": "dev",
+    "topic": "Privacy-enhanced AI",
+    "type": "metadata_filter",
+    "question": "In section 3.6 Privacy-Enhanced, under what condition can privacy-enhancing techniques reduce accuracy?",
+    "answerable": true,
+    "expected_answer": "Under conditions such as data sparsity; the resulting accuracy loss can affect fairness and other values in some domains.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 22,
+        "evidence": "Under certain conditions such as data sparsity, privacy- enhancing techniques can result in a loss in accuracy, affecting decisions about fairness and other values in certain domains."
+      }
+    ],
+    "filter": {
+      "section": "3.6 Privacy-Enhanced"
+    }
+  },
+  {
+    "id": "NT01",
+    "split": "test",
+    "topic": "Governance review",
+    "type": "direct",
+    "question": "Within section 5.1 GOVERN, what ongoing risk-management activity does GOVERN 1.5 say should be planned?",
+    "answerable": true,
+    "expected_answer": "Ongoing monitoring and periodic review of the risk-management process and its outcomes.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 28,
+        "evidence": "Ongoing monitoring and periodic review of the risk management process and its outcomes are planned"
+      }
+    ],
+    "filter": {
+      "section": "5.1 GOVERN"
+    }
+  },
+  {
+    "id": "NT02",
+    "split": "test",
+    "topic": "MAP context",
+    "type": "direct",
+    "question": "Within section 5.2 MAP, what should the competencies, skills, and capacities of interdisciplinary AI actors reflect?",
+    "answerable": true,
+    "expected_answer": "They should reflect demographic diversity and broad domain and user experience expertise.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 31,
+        "evidence": "reflect demographic diversity and broad domain and user experience expertise"
+      }
+    ],
+    "filter": {
+      "section": "5.2 MAP"
+    }
+  },
+  {
+    "id": "NT03",
+    "split": "test",
+    "topic": "Measurement review",
+    "type": "direct",
+    "question": "Within section 5.3 MEASURE, what does MEASURE 1.2 say should be regularly assessed and updated?",
+    "answerable": true,
+    "expected_answer": "The appropriateness of AI metrics and the effectiveness of existing controls.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 34,
+        "evidence": "Appropriateness of AI metrics and effectiveness of existing controls are regularly assessed and updated"
+      }
+    ],
+    "filter": {
+      "section": "5.3 MEASURE"
+    }
+  },
+  {
+    "id": "NT04",
+    "split": "test",
+    "topic": "Community feedback",
+    "type": "direct",
+    "question": "Within section 5.3 MEASURE, what does MEASURE 3.3 allow end users and impacted communities to report or appeal?",
+    "answerable": true,
+    "expected_answer": "They can report problems and appeal system outcomes through feedback processes.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 36,
+        "evidence": "report problems and appeal system outcomes"
+      }
+    ],
+    "filter": {
+      "section": "5.3 MEASURE"
+    }
+  },
+  {
+    "id": "NT05",
+    "split": "test",
+    "topic": "AI-specific environmental risks",
+    "type": "direct",
+    "question": "In Appendix B, what AI-specific cost does the framework identify as affecting the environment and planet?",
+    "answerable": true,
+    "expected_answer": "Computational costs for developing AI systems and their impact on the environment and planet.",
+    "gold": [
+      {
+        "source_id": "nist-ai-rmf-1-0",
+        "page": 44,
+        "evidence": "Computational costs for developing AI systems and their impact on the environment and planet"
+      }
+    ],
+    "filter": {
+      "section": "Appendix B"
+    }
+  },
+  {
+    "id": "DU01",
+    "split": "dev",
+    "topic": "Assessor count",
+    "type": "insufficient_evidence",
+    "question": "What minimum number of independent assessors does the NIST AI RMF require for every AI system risk evaluation?",
+    "answerable": false,
+    "expected_behavior": "search_and_abstain",
+    "absence_reason": "The document mentions independent assessors but does not specify a mandatory minimum count."
+  },
+  {
+    "id": "DU02",
+    "split": "dev",
+    "topic": "AI inventory limits",
+    "type": "insufficient_evidence",
+    "question": "How many AI systems may an organization list in its AI inventory before the framework requires special approval?",
+    "answerable": false,
+    "expected_behavior": "search_and_abstain",
+    "absence_reason": "The document calls for mechanisms to inventory AI systems but specifies neither a maximum inventory size nor an approval threshold."
+  },
+  {
+    "id": "TU01",
+    "split": "test",
+    "topic": "Implementation budget",
+    "type": "insufficient_evidence",
+    "question": "What minimum annual budget in US dollars does NIST require an organization to allocate to implement the AI RMF?",
+    "answerable": false,
+    "expected_behavior": "search_and_abstain",
+    "absence_reason": "Across the indexed pages, no required annual dollar budget is specified; mentions of costs are not a budget requirement."
+  },
+  {
+    "id": "TU02",
+    "split": "test",
+    "topic": "Universal accuracy threshold",
+    "type": "insufficient_evidence",
+    "question": "What minimum accuracy percentage must every AI system achieve before deployment under the AI RMF?",
+    "answerable": false,
+    "expected_behavior": "search_and_abstain",
+    "absence_reason": "The document discusses context-dependent metrics and performance but sets no universal minimum accuracy percentage."
+  }
+]
