@@ -30,12 +30,46 @@ class LocalControllerTests(unittest.TestCase):
             [],
         )
 
+    def test_extracts_only_explicit_inline_citations_when_array_is_omitted(self):
+        self.assertEqual(
+            parse_action(
+                '{"action":"answer","answer":"Fact [chunk-1] and [chunk-2]"}'
+            )["citations"],
+            ["chunk-1", "chunk-2"],
+        )
+        self.assertEqual(
+            parse_action(
+                '{"action":"answer","answer":"INSUFFICIENT_EVIDENCE"}'
+            )["citations"],
+            [],
+        )
+        self.assertEqual(
+            parse_action(
+                '{"action":"answer","answer":"Unsupported claim"}'
+            )["citations"],
+            [],
+        )
+
+    def test_parses_json_fenced_in_markdown(self):
+        self.assertEqual(
+            parse_action(
+                '```json\n{"action":"answer","answer":"Fact [c1]",'
+                '"citations":["c1"]}\n```'
+            ),
+            {
+                "action": "answer",
+                "answer": "Fact [c1]",
+                "citations": ["c1"],
+            },
+        )
+
     def test_rejects_malformed_or_unsafe_actions(self):
         for raw in (
             "not JSON",
             "[]",
             '{"action":"search","query":" "}',
             '{"action":"answer","answer":"Fact","citations":[1]}',
+            '{"action":"answer","answer":"Fact","citations":null}',
             '{"action":"execute","command":"..."}',
         ):
             with self.subTest(raw=raw), self.assertRaises(ValueError):

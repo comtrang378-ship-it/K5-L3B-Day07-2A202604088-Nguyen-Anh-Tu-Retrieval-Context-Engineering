@@ -6,12 +6,53 @@ benchmark quality.
 from datetime import datetime, timezone
 import math
 from pathlib import Path
+import re
 import time
 from typing import Any, Protocol
 from uuid import uuid4
 
 from baseline import pack_context
 from tracing import append_jsonl, sanitize_error_message
+
+
+_QUERY_FILLERS = {
+    "a", "an", "and", "are", "as", "at", "be", "before", "by", "can",
+    "could", "did", "do", "does", "for", "from", "how", "in", "into",
+    "is", "it", "of", "on", "or", "should", "that", "the", "their",
+    "this", "to", "under", "what", "when", "where", "which", "who",
+    "why", "would",
+}
+
+
+def _anchor_search_query(question: str, proposed_query: str) -> str:
+    question_terms = set(re.findall(r"\w+", question.casefold())) - _QUERY_FILLERS
+    query_terms = set(re.findall(r"\w+", proposed_query.casefold()))
+    if question_terms.issubset(query_terms):
+        return proposed_query
+    return f"{proposed_query} {question}"
+
+
+def _context_snippet(text: str, question: str) -> str:
+    normalized = " ".join(text.split())
+    sentences = re.split(r"(?<=[.!?])\s+", normalized)
+    if len(sentences) < 2:
+        return normalized
+
+    terms = set(re.findall(r"\w+", question.casefold())) - _QUERY_FILLERS
+    if not terms:
+        return normalized
+
+    scored = [
+        (
+            len(terms.intersection(re.findall(r"\w+", sentence.casefold()))),
+            -len(sentence),
+            -index,
+            sentence,
+        )
+        for index, sentence in enumerate(sentences)
+    ]
+    best = max(scored)
+    return best[3] if best[0] else normalized
 
 
 class Controller(Protocol):
@@ -125,13 +166,29 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
             action = controller.decide(question, history)
             if action.get('action') == 'search':
                 if sum(e['event'] == 'search' for e in events) >= max_searches:
-                    events.append({'event': 'search_limit'})
+                    proposed_query = action.get('query')
+                    events.append({
+                        'event': 'search_limit',
+                        'proposed_query': (
+                            proposed_query
+                            if isinstance(proposed_query, str)
+                            else None
+                        ),
+                        'max_searches': max_searches,
+                        'controller_model': {
+                            key: action[key]
+                            for key in ('provider', 'model', 'usage', 'cost_usd')
+                            if key in action
+                        },
+                    })
                     return finish(
                         'abstain', 'Không đủ bằng chứng để trả lời.', []
                     )
                 query = action.get('query')
                 if not isinstance(query, str) or not query.strip():
                     raise ValueError('search query phải là chuỗi không rỗng')
+                controller_query = query.strip()
+                query = _anchor_search_query(question, controller_query)
 
                 event = {
                     'event': 'search',
@@ -139,6 +196,7 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
                     'tool_call': {
                         'name': 'retrieval.search',
                         'query': query,
+                        'controller_query': controller_query,
                         'filters': filters,
                         'top_k': top_k,
                         'controller_model': {
@@ -148,6 +206,7 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
                         },
                     },
                     'query': query,
+                    'controller_query': controller_query,
                     'filter': filters,
                     'top_k': top_k,
                 }
@@ -170,7 +229,27 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
                     raise ValueError('retriever phải trả tối đa top_k chunk ID duy nhất')
                 candidates.extend(results)
                 stage = "context"
-                context, ids = pack_context(candidates, budget=budget)
+                ordered_candidates = sorted(
+                    enumerate(candidates),
+                    key=lambda item: (
+                        -float(item[1]["score"])
+                        if isinstance(item[1].get("score"), (int, float))
+                        and math.isfinite(float(item[1]["score"]))
+                        else math.inf,
+                        item[0],
+                    ),
+                )
+                context_candidates = [
+                    {
+                        **candidate,
+                        'text': _context_snippet(candidate['text'], question),
+                    }
+                    for _, candidate in ordered_candidates
+                ]
+                context, ids = pack_context(
+                    context_candidates,
+                    budget=budget,
+                )
                 chunks = {c['id']: c for c in candidates if c['id'] in ids}
                 event.update({
                     'status': 'ok',
@@ -178,6 +257,10 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
                     'results': results,
                     'context': context,
                     'context_ids': ids,
+                    'context_selection': (
+                        'query-relevant sentence snippets; highest retrieval score first; '
+                        'stable ties; deduplicate by chunk ID'
+                    ),
                 })
                 if retrieval_trace is not None:
                     event['retrieval_trace'] = {
@@ -188,8 +271,13 @@ def run_agent(question: str, controller: Controller, retriever: Retriever, *,
                 history = [{'tool': 'search', 'queries': [e['query'] for e in events if e['event'] == 'search'],
                             'context': context, 'context_ids': ids}]
             elif action.get('action') == 'answer':
-                answer, citations = action.get('answer'), action.get('citations')
-                if not isinstance(answer, str) or not isinstance(citations, list) or any(not isinstance(i, str) for i in citations):
+                answer = action.get('answer')
+                citations = action.get('citations', [])
+                if (
+                    not isinstance(answer, str)
+                    or not isinstance(citations, list)
+                    or any(not isinstance(i, str) for i in citations)
+                ):
                     raise ValueError('answer/citations không hợp lệ')
                 valid = bool(answer.strip() and citations and all(i in chunks and f'[{i}]' in answer for i in citations))
                 if valid:

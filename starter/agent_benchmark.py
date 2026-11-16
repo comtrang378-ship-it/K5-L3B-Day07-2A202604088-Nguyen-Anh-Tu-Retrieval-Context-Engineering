@@ -85,7 +85,7 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--context-budget", type=int, default=800)
     parser.add_argument("--max-searches", type=int, default=2)
-    parser.add_argument("--max-new-tokens", type=int, default=96)
+    parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument(
         "--limit",
         type=int,

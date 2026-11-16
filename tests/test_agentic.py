@@ -33,15 +33,56 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(r.calls, [('hoàn tiền', {'year': 2025}, 3)])
         self.assertEqual(result['events'][0]['context_ids'], ['c1'])
 
+    def test_search_query_keeps_question_terms_omitted_by_controller(self):
+        question = 'How does the AI RMF define an AI system?'
+        controller = Controller([
+            {'action': 'search', 'query': 'AI RMF definition'},
+            {'action': 'answer', 'answer': 'Not enough evidence', 'citations': []},
+        ])
+        retriever = Retriever([CHUNK])
+        result = run_agent(question, controller, retriever)
+        search_event = result['events'][0]
+        self.assertIn('AI system', retriever.calls[0][0])
+        self.assertEqual(search_event['controller_query'], 'AI RMF definition')
+        self.assertEqual(
+            search_event['tool_call']['controller_query'], 'AI RMF definition'
+        )
+        self.assertEqual(search_event['query'], retriever.calls[0][0])
+
     def test_invalid_citation_and_empty_context_abstain(self):
         for rows, cid in (([CHUNK], 'not-present'), ([], 'c1')):
             c = Controller([{'action':'search','query':'q'}, {'action':'answer','answer':f'7 ngày [{cid}]','citations':[cid]}])
             self.assertEqual(run_agent('q', c, Retriever(rows))['status'], 'abstain')
 
+    def test_uncited_model_answer_is_logged_and_abstained(self):
+        controller = Controller([
+            {'action': 'search', 'query': 'hoàn tiền'},
+            {'action': 'answer', 'answer': 'Hoàn tiền mất bảy ngày.'},
+        ])
+        result = run_agent('Hoàn tiền?', controller, Retriever([CHUNK]))
+        self.assertEqual(result['status'], 'abstain')
+        self.assertEqual(
+            result['events'][-1]['event'], 'invalid_or_missing_citations'
+        )
+        self.assertEqual(
+            result['events'][-1]['model_answer'], 'Hoàn tiền mất bảy ngày.'
+        )
+
     def test_search_limit_is_enforced(self):
-        c = Controller([{'action':'search','query':'one'}, {'action':'search','query':'two'}, {'action':'search','query':'three'}])
+        c = Controller([
+            {'action':'search','query':'one'},
+            {'action':'search','query':'two'},
+            {'action':'search','query':'three','provider':'local','model':'test-model'},
+        ])
         r = Retriever([CHUNK]); result = run_agent('q', c, r, max_searches=2)
         self.assertEqual(result['status'], 'abstain'); self.assertEqual(len(r.calls), 2)
+        limit_event = result['events'][-1]
+        self.assertEqual(limit_event['proposed_query'], 'three')
+        self.assertEqual(limit_event['max_searches'], 2)
+        self.assertEqual(
+            limit_event['controller_model'],
+            {'provider': 'local', 'model': 'test-model'},
+        )
 
     def test_context_budget_across_multiple_searches(self):
         other = {**CHUNK, 'id': 'c2', 'text': 'Một đoạn bằng chứng khác.'}
@@ -61,6 +102,64 @@ class AgentTests(unittest.TestCase):
         result = run_agent('q', InspectController(), SequentialRetriever(), budget=90)
         self.assertEqual(result['status'], 'answered')
         self.assertTrue(all(len(e['context']) <= 90 for e in result['events'] if e['event'] == 'search'))
+
+    def test_context_prioritizes_relevance_across_searches(self):
+        higher = {**CHUNK, 'id': 'c2', 'text': 'Bằng chứng liên quan hơn.', 'score': 0.95}
+        lower = {**CHUNK, 'score': 0.4}
+
+        class SequentialRetriever:
+            def __init__(self): self.i = 0
+            def search(self, query, *, filters, top_k):
+                self.i += 1
+                return [lower] if self.i == 1 else [higher]
+
+        controller = Controller([
+            {'action': 'search', 'query': 'first'},
+            {'action': 'search', 'query': 'second'},
+            {'action': 'answer', 'answer': 'Evidence [c2]', 'citations': ['c2']},
+        ])
+        result = run_agent('q', controller, SequentialRetriever())
+        second_search = [
+            event for event in result['events'] if event['event'] == 'search'
+        ][1]
+        self.assertEqual(second_search['context_ids'], ['c2', 'c1'])
+        self.assertIn('highest retrieval score first', second_search['context_selection'])
+
+    def test_context_uses_query_relevant_sentences_to_fit_more_chunks(self):
+        long_unrelated = {
+            **CHUNK,
+            'id': 'c2',
+            'text': (
+                'This chunk discusses unrelated governance details for several '
+                'paragraphs. The AI RMF Core includes GOVERN, MAP, MEASURE, and MANAGE.'
+            ),
+            'score': 0.8,
+        }
+        definition = {
+            **CHUNK,
+            'id': 'c3',
+            'page': 6,
+            'text': (
+                'General discussion of risk. The AI RMF defines an AI system as an '
+                'engineered or machine-based system that generates outputs.'
+            ),
+            'score': 0.7,
+        }
+        controller = Controller([
+            {'action': 'search', 'query': 'AI RMF definition'},
+            {'action': 'answer', 'answer': 'Claim [c3]', 'citations': ['c3']},
+        ])
+        result = run_agent(
+            'How does the AI RMF define an AI system?',
+            controller,
+            Retriever([CHUNK, long_unrelated, definition]),
+            budget=800,
+        )
+        search_event = result['events'][0]
+        self.assertIn('c3', search_event['context_ids'])
+        self.assertIn('defines an AI system', search_event['context'])
+        self.assertNotIn('unrelated governance details', search_event['context'])
+        self.assertIn('query-relevant sentence snippets', search_event['context_selection'])
 
     def test_configurable_retrieval_allows_more_than_two_calls(self):
         c = Controller([{'action': 'search', 'query': str(i)} for i in range(3)] +
